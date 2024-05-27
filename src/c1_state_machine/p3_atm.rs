@@ -13,6 +13,17 @@ pub enum Key {
     Four,
     Enter,
 }
+impl Key {
+    pub fn to_int(&self) -> Option<u32> {
+        match *self {
+            Key::One => Some(1),
+            Key::Two => Some(2),
+            Key::Three => Some(3),
+            Key::Four => Some(4),
+            _ => None, // For keys like Enter, return None
+        }
+    }
+}
 
 /// Something you can do to the ATM
 pub enum Action {
@@ -58,8 +69,69 @@ impl StateMachine for Atm {
     type Transition = Action;
 
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Exercise 4")
-    }
+
+            match (starting_state.expected_pin_hash.clone(), t) {
+                (Auth::Waiting, Action::SwipeCard(x)) => Atm {
+                    cash_inside: starting_state.cash_inside,
+                    expected_pin_hash: Auth::Authenticating(*x),
+                    keystroke_register: Vec::new(),
+                },
+                // check if card is swiped when pressed key 
+                (Auth::Waiting, Action::PressKey(_)) => Atm {
+                        cash_inside: starting_state.cash_inside,
+                        expected_pin_hash: Auth::Waiting,
+                        keystroke_register: Vec::new(),
+                },
+                (Auth::Authenticating(x), Action::PressKey(Key::Enter)) => {
+                    let pin_hash = crate::hash(&starting_state.keystroke_register);
+                    if pin_hash == x {
+                        Atm {
+                            cash_inside: starting_state.cash_inside,
+                            expected_pin_hash: Auth::Authenticated,
+                            keystroke_register: Vec::new(),
+                        }
+                    } else {
+                        Atm {
+                            cash_inside: starting_state.cash_inside,
+                            expected_pin_hash: Auth::Waiting,
+                            keystroke_register: Vec::new(),
+                        }
+                    }
+                },
+                (Auth::Authenticated, Action::PressKey(Key::Enter)) => {
+                    // Assuming keystroke_register is a Vec or LinkedList
+                    let mut register = starting_state.keystroke_register.clone();
+                    let mut number_string = String::new();
+                    for key in register.iter() {
+                        number_string.push_str(&key.to_int().unwrap().to_string());
+                    }
+                    let withdraw_amount = number_string.parse::<u64>().unwrap();
+                    if withdraw_amount <= starting_state.cash_inside {
+                        Atm {
+                            cash_inside: starting_state.cash_inside - withdraw_amount,
+                            expected_pin_hash: Auth::Waiting,
+                            keystroke_register: Vec::new(),
+                        }
+                    } else {
+                        Atm {
+                            cash_inside: starting_state.cash_inside,
+                            expected_pin_hash: Auth::Waiting,
+                            keystroke_register: Vec::new(),
+                        }
+                    }
+                },
+                (_, Action::PressKey(k)) => {
+                    let mut new_register = starting_state.keystroke_register.clone();
+                    new_register.push(k.clone());
+                    Atm {
+                        cash_inside: starting_state.cash_inside,
+                        expected_pin_hash: starting_state.expected_pin_hash.clone(),
+                        keystroke_register: new_register,
+                    }
+                },
+                _ => starting_state.clone(),
+            }
+        }
 }
 
 #[test]
