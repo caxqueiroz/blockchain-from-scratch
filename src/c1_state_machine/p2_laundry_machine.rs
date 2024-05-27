@@ -39,100 +39,42 @@ impl StateMachine for ClothesMachine {
     type State = ClothesState;
     type Transition = ClothesAction;
 
+
+
     fn next_state(starting_state: &ClothesState, t: &ClothesAction) -> ClothesState {
 
         match starting_state {
             ClothesState::Clean(x) => {
                 match t {
-                    ClothesAction::Wear => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Dirty(y)
-                        }
-
-                    }
-                    ClothesAction::Wash => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Wet(y)
-                        }
-                    }
-                    ClothesAction::Dry => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Clean(x - 1)
-                        }
-                    }
-
+                    ClothesAction::Wear => decrease_life_and_check_tattered(*x, ClothesState::Dirty(x - 1)),
+                    ClothesAction::Wash => decrease_life_and_check_tattered(*x, ClothesState::Wet(x - 1)),
+                    ClothesAction::Dry => decrease_life_and_check_tattered(*x, ClothesState::Clean(x - 1)),
                 }
             }
             ClothesState::Dirty(x) => {
                 match t {
-                    ClothesAction::Wear => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Dirty(y)
-                        }
-                    }
-                    ClothesAction::Wash => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Wet(y)
-                        }
-                    }
-                    ClothesAction::Dry => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Dirty(x - 1)
-                        }
-                    }
+                    ClothesAction::Wear => decrease_life_and_check_tattered(*x, ClothesState::Dirty(x - 1)),
+                    ClothesAction::Wash => decrease_life_and_check_tattered(*x, ClothesState::Wet(x - 1)),
+                    ClothesAction::Dry => decrease_life_and_check_tattered(*x, ClothesState::Dirty(x - 1)),
                 }
             }
             ClothesState::Wet(x) => {
-
                 match t {
-                    ClothesAction::Wear => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Dirty(y)
-                        }
-                    }
-                    ClothesAction::Wash => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                            ClothesState::Wet(y)
-                        }
-                    }
-                    ClothesAction::Dry => {
-                        let y = x - 1;
-                        if y == 0 {
-                            ClothesState::Tattered
-                        } else {
-                        ClothesState::Clean(x - 1)
-                            }
-                    }
+                    ClothesAction::Wear => decrease_life_and_check_tattered(*x, ClothesState::Dirty(x - 1)),
+                    ClothesAction::Wash => decrease_life_and_check_tattered(*x, ClothesState::Wet(x - 1)),
+                    ClothesAction::Dry => decrease_life_and_check_tattered(*x, ClothesState::Clean(x - 1)),
                 }
             }
-            ClothesState::Tattered => {
-                ClothesState::Tattered
-            }
+            ClothesState::Tattered => ClothesState::Tattered,
         }
+    }
+
+}
+fn decrease_life_and_check_tattered(life: u64, next_state: ClothesState) -> ClothesState {
+    if life == 1 {
+        ClothesState::Tattered
+    } else {
+        next_state
     }
 }
 
