@@ -13,7 +13,7 @@ pub struct DigitalCashSystem;
 /// A single bill in the digital cash system. Each bill has an owner who is allowed to spent
 /// it and an amount that it is worth. It also has serial number to ensure that each bill
 /// is unique.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Clone, Debug, Hash)]
 pub struct Bill {
     owner: User,
     amount: u64,
@@ -24,6 +24,7 @@ pub struct Bill {
 /// but also a counter for the next serial number.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
+
     /// The set of currently circulating bills
     bills: HashSet<Bill>,
     /// The next serial number to use when a bill is created.
@@ -94,7 +95,86 @@ impl StateMachine for DigitalCashSystem {
     type Transition = CashTransaction;
 
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Exercise 1")
+        let mut state = starting_state.clone();
+
+        match t {
+            CashTransaction::Mint { minter, amount } => {
+                state.add_bill(Bill {
+                    owner: *minter,
+                    amount: *amount,
+                    serial: state.next_serial(),
+                });
+            }
+            CashTransaction::Transfer { spends, receives } => {
+                let mut new_bills = HashSet::<Bill>::new();
+                let mut total_spent = 0;
+                let mut total_received = 0;
+
+                let spends_serials: HashSet<_> = spends.iter().map(|bill| bill.serial).collect();
+                if spends_serials.len() != spends.len() {
+                    return state;
+                }
+                // check for receives
+                let receives_serials: HashSet<_> = receives.iter().map(|bill| bill.serial).collect();
+                if receives_serials.len() != receives.len() {
+                    return state;
+                }
+
+
+                // check if spends are valid
+                if spends.iter().any(|b| b.amount == 0) {
+                    return state;
+                }
+
+                // check if bills are the same
+                for bs in spends.iter() {
+                    for br in receives.iter() {
+                        if bs.serial == br.serial {
+                            return state;
+                        }
+                    }
+                }
+
+                for bill in spends {
+                    if !state.bills.contains(bill) {
+                        return state;
+                    }
+                    total_spent += bill.amount;
+                }
+
+                for bill in receives {
+                    if bill.amount == 0 {
+                        return state;
+                    }
+                    if state.bills.contains(bill) {
+                        return state;
+                    }
+                    if bill.serial == u64::MAX {
+                        return state;
+                    }
+                    if (total_received + bill.amount) > total_spent {
+                        return state;
+                    }
+                    total_received += bill.amount;
+                }
+                if total_spent < total_received {
+                    return state;
+                }
+                for bill in spends {
+                    state.bills.remove(bill);
+                }
+
+                for bill in receives {
+                    new_bills.insert(bill.clone());
+                }
+
+                for bill in new_bills {
+                    state.add_bill(bill);
+                }
+            }
+        }
+
+        state
     }
 }
 
