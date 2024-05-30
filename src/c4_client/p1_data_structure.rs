@@ -24,12 +24,20 @@ type Hash = u64;
 impl<Digest> Header<Digest> {
     /// Returns a new valid genesis header.
     fn genesis(genesis_state_root: Hash) -> Self {
-        todo!("Exercise 1")
+        Header{
+
+        }
     }
 
     /// Create and return a valid child header.
     fn child(&self, state_root: Hash, extrinsics_root: Hash) -> Self {
-        todo!("Exercise 2")
+        Header{
+            parent: self.parent,
+            height: self.height + 1,
+            extrinsics_root,
+            state_root,
+            consensus_digest: 0,
+        }
     }
 
     /// Verify a single child header.
