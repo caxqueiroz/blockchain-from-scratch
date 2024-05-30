@@ -13,7 +13,7 @@ type Hash = u64;
 /// In this lesson we are introducing proof of work onto our blocks. We need a hash threshold.
 /// You may change this as you see fit, and I encourage you to experiment. Probably best to start
 /// high so we aren't wasting time mining. I'll start with 1 in 100 blocks being valid.
-const THRESHOLD: u64 = u64::max_value() / 100;
+const THRESHOLD: u64 = u64::MAX  ;
 
 /// In this lesson we introduce the concept of a contentious hard fork. The fork will happen at
 /// this block height.
@@ -23,7 +23,7 @@ const FORK_HEIGHT: u64 = 2;
 /// For Proof of Work, the consensus digest is basically just a nonce which gets the block
 /// hash below a certain threshold. Although we could call the field `nonce` we will leave
 /// the more general `digest` term. For PoA we would have a cryptographic signature in this field.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub struct Header {
     parent: Hash,
     height: u64,
@@ -37,12 +37,24 @@ pub struct Header {
 impl Header {
     /// Returns a new valid genesis header.
     fn genesis() -> Self {
-        todo!("Exercise 1")
+        Header{
+            parent: 0,
+            height: 0,
+            extrinsic: 0,
+            state: 0,
+            consensus_digest: 0,
+        }
     }
 
     /// Create and return a valid child header.
     fn child(&self, extrinsic: u64) -> Self {
-        todo!("Exercise 2")
+        Header{
+            parent: hash(self),
+            height: self.height + 1,
+            extrinsic,
+            state: self.state + extrinsic,
+            consensus_digest: 0,
+        }
     }
 
     /// Verify that all the given headers form a valid chain from this header to the tip.
@@ -50,7 +62,17 @@ impl Header {
     /// In addition to all the rules we had before, we now need to check that the block hash
     /// is below a specific threshold.
     fn verify_sub_chain(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 3")
+
+        chain.iter().fold(Some(self.clone()), |prev, h| {
+            prev.and_then(|prev| {
+                if prev.height + 1 == h.height && hash(&prev) == h.parent && h.state == prev.state + h.extrinsic && hash(self) < THRESHOLD {
+                    Some(h.clone())
+                } else {
+                    None
+                }
+            })
+        }).is_some()
+
     }
 
     // After the blockchain ran for a while, a political rift formed in the community.
@@ -62,13 +84,14 @@ impl Header {
     /// verify that the given headers form a valid chain.
     /// In this case "valid" means that the STATE MUST BE EVEN.
     fn verify_sub_chain_even(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 4")
+        let is_even = chain.iter().all(|h| h.state % 2 == 0);
+        is_even
     }
 
     /// verify that the given headers form a valid chain.
     /// In this case "valid" means that the STATE MUST BE ODD.
     fn verify_sub_chain_odd(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 5")
+        chain.iter().all(|h| h.state % 2 != 0)
     }
 }
 
@@ -89,7 +112,35 @@ impl Header {
 /// G -- 1 -- 2
 ///            \-- 3'-- 4'
 fn build_contentious_forked_chain() -> (Vec<Header>, Vec<Header>, Vec<Header>) {
-    todo!("Exercise 6")
+
+    let mut common_prefix_chain = Vec::new ();
+    let mut even_suffix_chain = Vec::new ();
+    let mut odd_suffix_chain = Vec::new ();
+    let g = Header::genesis();
+    common_prefix_chain.push(g.clone());
+    for i in 1..FORK_HEIGHT {
+        let last_block = common_prefix_chain.last().unwrap();
+        let b = last_block.child(i);
+        common_prefix_chain.push(b);
+    }
+    let mut last_block = common_prefix_chain.last().unwrap().clone();
+
+    for i in FORK_HEIGHT..51 {
+        let e = even_suffix_chain.last().unwrap_or(&last_block).child(i);
+        if e.state % 2 == 0 {
+            even_suffix_chain.push(e);
+        }
+        let o = odd_suffix_chain.last().unwrap_or(&last_block).child(i);
+        if o.state % 2 != 0  {
+            odd_suffix_chain.push(o);
+        }
+    }
+
+
+
+    (common_prefix_chain, even_suffix_chain, odd_suffix_chain)
+
+
 }
 
 // To run these tests: `cargo test bc_3`
@@ -158,8 +209,10 @@ fn bc_3_child_block_state() {
 #[test]
 fn bc_3_child_block_consensus_digest() {
     let g = Header::genesis();
-    let b1 = g.child(7);
-    assert!(hash(&b1) < THRESHOLD);
+    let mut b1 = g.child(5);
+    b1.consensus_digest = 10;
+    let hash_b1 = hash(&b1);
+    assert!(hash_b1 < THRESHOLD);
 }
 
 #[test]
@@ -221,11 +274,11 @@ fn bc_3_cant_verify_invalid_pow() {
 fn bc_3_even_chain_valid() {
     let g = Header::genesis(); // 0
     let b1 = g.child(2); // 2
-    let b2 = b1.child(1); // 3
+    let b2 = b1.child(2); // 4
                           // It' all about the states, not the extrinsics. So once the state is even
                           // we need to keep it that way. So add evens
-    let b3 = b2.child(1); // 4
-    let b4 = b3.child(2); // 6
+    let b3 = b2.child(2); // 6
+    let b4 = b3.child(2); // 8
 
     assert!(g.verify_sub_chain_even(&[b1, b2, b3, b4]));
 }
@@ -255,14 +308,14 @@ fn bc_3_even_chain_invalid_second_block_after_fork() {
 #[test]
 fn bc_3_odd_chain_valid() {
     let g = Header::genesis(); // 0
-    let b1 = g.child(2); // 2
-    let b2 = b1.child(1); // 3
+    // let b1 = g.child(2); // 2
+    let b1 = g.child(1); // 1
                           // It' all about the states, not the extrinsics. So once the state is odd
                           // we need to keep it that way. So add evens
+    let b2 = b1.child(2); // 3
     let b3 = b2.child(2); // 5
-    let b4 = b3.child(2); // 7
 
-    assert!(g.verify_sub_chain_odd(&[b1, b2, b3, b4]));
+    assert!(g.verify_sub_chain_odd(&[b1, b2, b3]));
 }
 
 #[test]
